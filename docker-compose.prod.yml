@@ -1,0 +1,9 @@
+# OpenSplit - Production Override
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# This override removes the DB port exposure for production security
+
+services:
+  db:
+    # Remove port exposure - DB only accessible via backend_net
+    ports: !reset []
