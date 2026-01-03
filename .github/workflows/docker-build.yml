@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version number (e.g., 1.0.0, 1.2.3)"
-        required: true
+        description: "Version number (optional - auto-calculated if empty, format: X.Y.Z)"
+        required: false
         type: string
       is_latest:
         description: "Also tag as latest"
@@ -22,9 +22,8 @@ on:
           - staging
           - production
       release_notes:
-        description: "Release notes for this version"
-        required: true
-        default: "Bug fixes and improvements"
+        description: "Release notes (optional - uses last commit message if empty)"
+        required: false
         type: string
 
 env:
@@ -40,16 +39,63 @@ jobs:
       packages: write
 
     steps:
-      - name: Validate version format
-        run: |
-          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "❌ Error: Version must be in format X.Y.Z (e.g., 1.0.0)"
-            exit 1
-          fi
-          echo "✅ Version format validated: ${{ inputs.version }}"
-
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for tags
+
+      - name: Calculate version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            # User provided version
+            VERSION="${{ inputs.version }}"
+            echo "Using provided version: ${VERSION}"
+          else
+            # Auto-calculate from git tags
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            LATEST_TAG=${LATEST_TAG#v}  # Remove 'v' prefix
+            
+            # Parse version components
+            IFS='.' read -ra VERSION_PARTS <<< "$LATEST_TAG"
+            MAJOR=${VERSION_PARTS[0]:-0}
+            MINOR=${VERSION_PARTS[1]:-0}
+            PATCH=${VERSION_PARTS[2]:-0}
+            
+            # Increment patch version
+            PATCH=$((PATCH + 1))
+            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            echo "Auto-calculated version: ${VERSION} (from ${LATEST_TAG})"
+          fi
+
+          # Validate format
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Error: Version must be in format X.Y.Z (got: ${VERSION})"
+            exit 1
+          fi
+
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "✅ Final version: ${VERSION}"
+
+      - name: Get release notes
+        id: notes
+        run: |
+          if [ -n "${{ inputs.release_notes }}" ]; then
+            # User provided release notes
+            NOTES="${{ inputs.release_notes }}"
+            echo "Using provided release notes"
+          else
+            # Get last commit message
+            NOTES=$(git log -1 --pretty=%B)
+            echo "Using last commit message as release notes"
+          fi
+
+          # Store in file to handle multi-line content
+          echo "$NOTES" > /tmp/release_notes.txt
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "📝 Release notes: ${NOTES}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -64,7 +110,8 @@ jobs:
       - name: Generate Docker tags
         id: tags
         run: |
-          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}"
           if [ "${{ inputs.is_latest }}" == "true" ]; then
             TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
           fi
@@ -85,7 +132,7 @@ jobs:
           labels: |
             org.opencontainers.image.title=OpenSplit Web
             org.opencontainers.image.description=OpenSplit Web - Open-source expense splitting API. A Splitwise alternative built with Laravel 11, PostgreSQL, and enterprise-grade architecture. Currently supports REST API with social authentication.
-            org.opencontainers.image.version=${{ inputs.version }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
             org.opencontainers.image.vendor=OpenSplit Web
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}#readme
@@ -95,44 +142,45 @@ jobs:
 
       - name: Test image
         run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }} php -v
+          VERSION="${{ steps.version.outputs.version }}"
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION} php -v
           echo "✅ Image test passed"
 
       - name: Update README with version badge
         run: |
-          # Update version in README if badge exists, or add it
+          VERSION="${{ steps.version.outputs.version }}"
           if grep -q "img.shields.io/badge/version" README.md; then
-            sed -i "s|img.shields.io/badge/version-[^-]*-|img.shields.io/badge/version-${{ inputs.version }}-|g" README.md
+            sed -i "s|img.shields.io/badge/version-[^-]*-|img.shields.io/badge/version-${VERSION}-|g" README.md
           else
-            # Add version badge after the first line
-            sed -i "2i\\\\n![Version](https://img.shields.io/badge/version-${{ inputs.version }}-blue)" README.md
+            sed -i "2i\\\\n![Version](https://img.shields.io/badge/version-${VERSION}-blue)" README.md
           fi
 
       - name: Commit version update
         run: |
+          VERSION="${{ steps.version.outputs.version }}"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add README.md
-          git diff --staged --quiet || git commit -m "chore: Update version to ${{ inputs.version }}"
+          git diff --staged --quiet || git commit -m "chore: Update version to ${VERSION}"
           git push || echo "No changes to push"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ inputs.version }}
-          name: Release v${{ inputs.version }}
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
           body: |
-            ## 🚀 OpenSplit Web v${{ inputs.version }}
+            ## 🚀 OpenSplit Web v${{ steps.version.outputs.version }}
 
             ### Release Notes
-            ${{ inputs.release_notes }}
+            ${{ steps.notes.outputs.notes }}
 
             ### 📦 Docker Image
 
             **Pull the image:**
             ```bash
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
             ```
 
             **Or use latest:**
@@ -153,12 +201,13 @@ jobs:
 
       - name: Job summary
         run: |
+          VERSION="${{ steps.version.outputs.version }}"
           echo "## 🐳 Docker Build & Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Image Details" >> $GITHUB_STEP_SUMMARY
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Version | \`${{ inputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | \`${VERSION}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Latest Tag | ${{ inputs.is_latest }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Environment | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -166,7 +215,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Specific version:**" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           if [ "${{ inputs.is_latest }}" == "true" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
@@ -177,4 +226,4 @@ jobs:
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📝 Release Notes" >> $GITHUB_STEP_SUMMARY
-          echo "${{ inputs.release_notes }}" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.notes.outputs.notes }}" >> $GITHUB_STEP_SUMMARY
