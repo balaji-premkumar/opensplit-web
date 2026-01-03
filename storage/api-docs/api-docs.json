@@ -1,8 +1,8 @@
 {
     "openapi": "3.0.0",
     "info": {
-        "title": "OpenSplit API",
-        "description": "Enterprise backend API for OpenSplit - an open-source Splitwise alternative",
+        "title": "OpenSplit Web API",
+        "description": "REST API for OpenSplit Web - an open-source Splitwise alternative. Currently supports API endpoints with web UI coming soon.",
         "contact": {
             "name": "OpenSplit Team",
             "email": "support@opensplit.io"
