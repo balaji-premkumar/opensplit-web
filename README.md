@@ -7,24 +7,139 @@
 
 ## Features
 
-- 🏠 **Group Management** - Create groups, add/remove members
-- 💰 **Expense Tracking** - Record expenses with flexible split options
-- ⚖️ **Balance Calculation** - Track who owes whom using paid_share/owed_share model
-- 📊 **REST API** - Full CRUD operations with OpenAPI documentation
-- 🐳 **Docker Ready** - Production-ready containerized deployment
-- 🔒 **Secure Architecture** - Enterprise 3-tier network isolation
+-   🔐 **Authentication** - API tokens with Laravel Sanctum + Social logins (Google, Facebook, X)
+-   🏠 **Group Management** - Create groups, add/remove members
+-   💰 **Expense Tracking** - Record expenses with flexible split options
+-   ⚖️ **Balance Calculation** - Track who owes whom using paid_share/owed_share model
+-   📊 **REST API** - Full CRUD operations with OpenAPI documentation
+-   🐳 **Docker Ready** - Production-ready containerized deployment
+-   🔒 **Secure Architecture** - Enterprise 3-tier network isolation
+-   🧪 **BDD Testing** - 24 tests with 113 assertions
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|------------|
-| Framework | Laravel 11 |
-| Language | PHP 8.4 |
-| Database | PostgreSQL 15 |
-| Containers | Docker Compose |
-| API Docs | Swagger/OpenAPI 3.0 |
-| Testing | PHPUnit (BDD-style) |
-| CI/CD | GitHub Actions |
+| Component      | Technology                  |
+| -------------- | --------------------------- |
+| Framework      | Laravel 11                  |
+| Language       | PHP 8.4                     |
+| Database       | PostgreSQL 15               |
+| Authentication | Laravel Sanctum + Socialite |
+| Containers     | Docker Compose              |
+| API Docs       | Swagger/OpenAPI 3.0         |
+| Testing        | PHPUnit (BDD-style)         |
+| CI/CD          | GitHub Actions              |
+
+## Quick Start
+
+### Prerequisites
+
+-   Docker & Docker Compose
+-   Git
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/balaji-premkumar/opensplit-web.git
+cd opensplit-web
+
+# Copy environment file
+cp .env.example .env
+
+# Start the containers
+docker compose up -d
+
+# Run migrations
+docker compose exec app php artisan migrate
+
+# Generate Swagger docs
+docker compose exec app php artisan l5-swagger:generate
+```
+
+### Access
+
+| Service     | URL                                     |
+| ----------- | --------------------------------------- |
+| Application | http://localhost:8080                   |
+| Swagger UI  | http://localhost:8080/api/documentation |
+
+## Authentication
+
+### Register & Login
+
+```bash
+# Register
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name": "John", "email": "john@example.com", "password": "password123", "password_confirmation": "password123"}'
+
+# Login
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "john@example.com", "password": "password123"}'
+```
+
+Response includes a `token` - use it for authenticated requests:
+
+```bash
+curl -H "Authorization: Bearer <token>" http://localhost:8080/api/groups
+```
+
+### Social Login
+
+Redirect users to OAuth providers:
+
+-   `GET /api/auth/google/redirect`
+-   `GET /api/auth/facebook/redirect`
+-   `GET /api/auth/twitter/redirect`
+
+Configure credentials in `.env`:
+
+```env
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
+FACEBOOK_CLIENT_ID=...
+TWITTER_CLIENT_ID=...
+```
+
+## API Endpoints
+
+### Authentication (Public)
+
+| Method | Endpoint                        | Description       |
+| ------ | ------------------------------- | ----------------- |
+| POST   | `/api/auth/register`            | Register new user |
+| POST   | `/api/auth/login`               | Login, get token  |
+| GET    | `/api/auth/{provider}/redirect` | OAuth redirect    |
+| GET    | `/api/auth/{provider}/callback` | OAuth callback    |
+
+### Authentication (Protected 🔒)
+
+| Method | Endpoint           | Description      |
+| ------ | ------------------ | ---------------- |
+| POST   | `/api/auth/logout` | Revoke token     |
+| GET    | `/api/auth/user`   | Get current user |
+
+### Groups (Protected 🔒)
+
+| Method | Endpoint                            | Description       |
+| ------ | ----------------------------------- | ----------------- |
+| GET    | `/api/groups`                       | List all groups   |
+| POST   | `/api/groups`                       | Create a group    |
+| GET    | `/api/groups/{id}`                  | Get group details |
+| PUT    | `/api/groups/{id}`                  | Update group      |
+| DELETE | `/api/groups/{id}`                  | Delete group      |
+| POST   | `/api/groups/{id}/members`          | Add members       |
+| DELETE | `/api/groups/{id}/members/{userId}` | Remove member     |
+
+### Expenses (Protected 🔒)
+
+| Method | Endpoint                    | Description                |
+| ------ | --------------------------- | -------------------------- |
+| POST   | `/api/expenses`             | Create expense with splits |
+| GET    | `/api/expenses/{id}`        | Get expense details        |
+| DELETE | `/api/expenses/{id}`        | Delete expense             |
+| GET    | `/api/groups/{id}/expenses` | Get group expenses         |
 
 ## Architecture
 
@@ -43,64 +158,6 @@
 │  backend_net:  app ←→ db (internal only)            │
 └─────────────────────────────────────────────────────┘
 ```
-
-## Quick Start
-
-### Prerequisites
-
-- Docker & Docker Compose
-- Git
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/opensplit.git
-cd opensplit
-
-# Copy environment file
-cp .env.example .env
-
-# Start the containers
-docker compose up -d
-
-# Run migrations
-docker compose exec app php artisan migrate
-
-# Generate Swagger docs
-docker compose exec app php artisan l5-swagger:generate
-```
-
-### Access
-
-| Service | URL |
-|---------|-----|
-| Application | http://localhost:8080 |
-| Swagger UI | http://localhost:8080/api/documentation |
-| Database | localhost:5432 (dev only) |
-
-## API Endpoints
-
-### Groups
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/groups` | List all groups |
-| POST | `/api/groups` | Create a group |
-| GET | `/api/groups/{id}` | Get group details |
-| PUT | `/api/groups/{id}` | Update group |
-| DELETE | `/api/groups/{id}` | Delete group |
-| POST | `/api/groups/{id}/members` | Add members |
-| DELETE | `/api/groups/{id}/members/{userId}` | Remove member |
-
-### Expenses
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/expenses` | Create expense with splits |
-| GET | `/api/expenses/{id}` | Get expense details |
-| DELETE | `/api/expenses/{id}` | Delete expense |
-| GET | `/api/groups/{id}/expenses` | Get group expenses |
 
 ## Expense Split Model
 
@@ -123,42 +180,33 @@ Example: $300 dinner, User A pays, split 3 ways
 # Run all tests
 docker compose exec app php artisan test
 
-# Run specific test suite
-docker compose exec app php artisan test --filter=ExpenseManagementTest
+# Run specific test suites
+docker compose exec app php artisan test --filter=AuthenticationTest
 docker compose exec app php artisan test --filter=GroupManagementTest
+docker compose exec app php artisan test --filter=ExpenseManagementTest
 ```
 
-**Test Coverage:**
-- 15 tests, 88 assertions
-- BDD-style with Given/When/Then pattern
+**Test Coverage:** 24 tests, 113 assertions (BDD-style)
+
+## CI/CD
+
+### Automatic (on PR)
+
+-   Runs tests and linting
+-   Required for merging to `master`
+
+### Manual (Docker Build)
+
+-   Trigger from Actions tab → "Docker Build"
+-   Builds and optionally pushes Docker images
+
+See [docs/BRANCH_PROTECTION.md](docs/BRANCH_PROTECTION.md) for branch protection setup.
 
 ## Development
-
-### Project Structure
-
-```
-opensplit/
-├── app/
-│   ├── DTOs/                 # Data Transfer Objects
-│   ├── Exceptions/           # Custom exceptions
-│   ├── Http/Controllers/     # API controllers
-│   ├── Models/               # Eloquent models
-│   ├── Repositories/         # Data access layer
-│   └── Services/             # Business logic
-├── database/migrations/      # Database schema
-├── tests/Feature/            # BDD feature tests
-├── docker/                   # Docker configs
-└── .github/workflows/        # CI/CD pipelines
-```
-
-### Commands
 
 ```bash
 # Start development
 docker compose up -d
-
-# Stop containers
-docker compose down
 
 # View logs
 docker compose logs -f app
@@ -168,25 +216,9 @@ docker compose exec app php artisan <command>
 
 # Regenerate Swagger docs
 docker compose exec app php artisan l5-swagger:generate
-```
 
-## CI/CD
-
-### Automatic (on PR)
-- **CI Workflow**: Runs tests and linting on every pull request
-- Required for merging to `master`
-
-### Manual
-- **Docker Build**: Build and optionally push Docker images
-- Trigger from Actions tab → "Run workflow"
-
-See [docs/BRANCH_PROTECTION.md](docs/BRANCH_PROTECTION.md) for branch protection setup.
-
-## Production Deployment
-
-```bash
-# Use production override (hides DB port)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Run tests
+docker compose exec app php artisan test
 ```
 
 ## Contributing
@@ -201,9 +233,4 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Inspired by [Splitwise](https://www.splitwise.com/)
-- Built with [Laravel](https://laravel.com/)
+MIT License - see [LICENSE](LICENSE) for details.

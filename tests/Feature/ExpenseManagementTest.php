@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Group;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
@@ -26,13 +27,16 @@ class ExpenseManagementTest extends TestCase
      */
     public function test_user_can_add_expense_with_valid_equal_splits(): void
     {
-        // Given: A group with 3 members
+        // Given: A group with 3 members (authenticated as creator)
         $creator = User::factory()->create();
         $member1 = User::factory()->create();
         $member2 = User::factory()->create();
         
         $group = Group::factory()->create(['created_by' => $creator->id]);
         $group->members()->attach([$creator->id, $member1->id, $member2->id]);
+
+        // Authenticate as the creator
+        Sanctum::actingAs($creator);
 
         // When: User adds a $300 expense split equally
         $response = $this->postJson('/api/expenses', [
@@ -112,6 +116,9 @@ class ExpenseManagementTest extends TestCase
         $group = Group::factory()->create(['created_by' => $creator->id]);
         $group->members()->attach([$creator->id, $member1->id, $member2->id]);
 
+        // Authenticate
+        Sanctum::actingAs($creator);
+
         // When: User adds a $300 expense but splits only sum to $250
         $response = $this->postJson('/api/expenses', [
             'description' => 'Movie tickets',
@@ -158,6 +165,10 @@ class ExpenseManagementTest extends TestCase
      */
     public function test_expense_requires_all_mandatory_fields(): void
     {
+        // Authenticate
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
         // When: User submits an empty request
         $response = $this->postJson('/api/expenses', []);
 
@@ -180,6 +191,9 @@ class ExpenseManagementTest extends TestCase
         // Given: A user and group
         $user = User::factory()->create();
         $group = Group::factory()->create(['created_by' => $user->id]);
+
+        // Authenticate
+        Sanctum::actingAs($user);
 
         // When: User submits expense with empty splits array
         $response = $this->postJson('/api/expenses', [

@@ -71,6 +71,14 @@ use OpenApi\Attributes as OA;
  *         )
  *     )
  * )
+ * 
+ * @OA\SecurityScheme(
+ *     securityScheme="sanctum",
+ *     type="http",
+ *     scheme="bearer",
+ *     bearerFormat="JWT",
+ *     description="Enter your Bearer token from login/register response"
+ * )
  */
 abstract class Controller
 {

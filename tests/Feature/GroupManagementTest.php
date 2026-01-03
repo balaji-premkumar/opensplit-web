@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Group;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
@@ -32,8 +33,9 @@ class GroupManagementTest extends TestCase
      */
     public function test_user_can_create_a_group(): void
     {
-        // Given: A user exists
+        // Given: A user exists (and is authenticated)
         $user = User::factory()->create();
+        Sanctum::actingAs($user);
 
         // When: User creates a group
         $response = $this->postJson('/api/groups', [
@@ -82,6 +84,10 @@ class GroupManagementTest extends TestCase
      */
     public function test_group_creation_requires_name_and_creator(): void
     {
+        // Authenticate
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
         // When: User submits empty request
         $response = $this->postJson('/api/groups', []);
 
@@ -112,6 +118,9 @@ class GroupManagementTest extends TestCase
         $group = Group::factory()->create(['created_by' => $creator->id]);
         $group->members()->attach([$creator->id, $member->id]);
 
+        // Authenticate
+        Sanctum::actingAs($creator);
+
         // When: User requests the group
         $response = $this->getJson("/api/groups/{$group->id}");
 
@@ -137,6 +146,10 @@ class GroupManagementTest extends TestCase
      */
     public function test_returns_404_for_nonexistent_group(): void
     {
+        // Authenticate
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
         // When: User requests non-existent group
         $response = $this->getJson('/api/groups/9999');
 
@@ -159,6 +172,9 @@ class GroupManagementTest extends TestCase
         // Given: Multiple groups exist
         $user = User::factory()->create();
         Group::factory()->count(3)->create(['created_by' => $user->id]);
+
+        // Authenticate
+        Sanctum::actingAs($user);
 
         // When: User lists all groups
         $response = $this->getJson('/api/groups');
@@ -189,6 +205,9 @@ class GroupManagementTest extends TestCase
             'name' => 'Old Name',
             'created_by' => $user->id,
         ]);
+
+        // Authenticate
+        Sanctum::actingAs($user);
 
         // When: User updates the group
         $response = $this->putJson("/api/groups/{$group->id}", [
@@ -232,6 +251,9 @@ class GroupManagementTest extends TestCase
         $user = User::factory()->create();
         $group = Group::factory()->create(['created_by' => $user->id]);
 
+        // Authenticate
+        Sanctum::actingAs($user);
+
         // When: User deletes the group
         $response = $this->deleteJson("/api/groups/{$group->id}");
 
@@ -270,6 +292,9 @@ class GroupManagementTest extends TestCase
         $group = Group::factory()->create(['created_by' => $creator->id]);
         $group->members()->attach($creator->id);
 
+        // Authenticate
+        Sanctum::actingAs($creator);
+
         // When: User adds new members
         $response = $this->postJson("/api/groups/{$group->id}/members", [
             'user_ids' => [$newMember1->id, $newMember2->id],
@@ -300,6 +325,9 @@ class GroupManagementTest extends TestCase
         
         $group = Group::factory()->create(['created_by' => $creator->id]);
         $group->members()->attach([$creator->id, $member->id]);
+
+        // Authenticate
+        Sanctum::actingAs($creator);
 
         // When: User removes a member
         $response = $this->deleteJson("/api/groups/{$group->id}/members/{$member->id}");
