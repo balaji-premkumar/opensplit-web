@@ -1,66 +1,209 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# OpenSplit
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+**Open-source expense splitting application** - A Splitwise alternative built with enterprise-grade architecture.
 
-## About Laravel
+[![CI](https://github.com/balaji-premkumar/opensplit-web/actions/workflows/ci.yml/badge.svg)](https://github.com/balaji-premkumar/opensplit-web/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Features
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- 🏠 **Group Management** - Create groups, add/remove members
+- 💰 **Expense Tracking** - Record expenses with flexible split options
+- ⚖️ **Balance Calculation** - Track who owes whom using paid_share/owed_share model
+- 📊 **REST API** - Full CRUD operations with OpenAPI documentation
+- 🐳 **Docker Ready** - Production-ready containerized deployment
+- 🔒 **Secure Architecture** - Enterprise 3-tier network isolation
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Tech Stack
 
-## Learning Laravel
+| Component | Technology |
+|-----------|------------|
+| Framework | Laravel 11 |
+| Language | PHP 8.4 |
+| Database | PostgreSQL 15 |
+| Containers | Docker Compose |
+| API Docs | Swagger/OpenAPI 3.0 |
+| Testing | PHPUnit (BDD-style) |
+| CI/CD | GitHub Actions |
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Architecture
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+```
+┌─────────────────────────────────────────────────────┐
+│                Service-Repository Pattern           │
+├─────────────────────────────────────────────────────┤
+│  Controller → Service → Repository → Database       │
+│  (HTTP)       (Logic)   (Queries)    (PostgreSQL)   │
+└─────────────────────────────────────────────────────┘
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+┌─────────────────────────────────────────────────────┐
+│              Docker Network Isolation               │
+├─────────────────────────────────────────────────────┤
+│  frontend_net: web ←→ app                           │
+│  backend_net:  app ←→ db (internal only)            │
+└─────────────────────────────────────────────────────┘
+```
 
-## Laravel Sponsors
+## Quick Start
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### Prerequisites
 
-### Premium Partners
+- Docker & Docker Compose
+- Git
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/YOUR_USERNAME/opensplit.git
+cd opensplit
+
+# Copy environment file
+cp .env.example .env
+
+# Start the containers
+docker compose up -d
+
+# Run migrations
+docker compose exec app php artisan migrate
+
+# Generate Swagger docs
+docker compose exec app php artisan l5-swagger:generate
+```
+
+### Access
+
+| Service | URL |
+|---------|-----|
+| Application | http://localhost:8080 |
+| Swagger UI | http://localhost:8080/api/documentation |
+| Database | localhost:5432 (dev only) |
+
+## API Endpoints
+
+### Groups
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/groups` | List all groups |
+| POST | `/api/groups` | Create a group |
+| GET | `/api/groups/{id}` | Get group details |
+| PUT | `/api/groups/{id}` | Update group |
+| DELETE | `/api/groups/{id}` | Delete group |
+| POST | `/api/groups/{id}/members` | Add members |
+| DELETE | `/api/groups/{id}/members/{userId}` | Remove member |
+
+### Expenses
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/expenses` | Create expense with splits |
+| GET | `/api/expenses/{id}` | Get expense details |
+| DELETE | `/api/expenses/{id}` | Delete expense |
+| GET | `/api/groups/{id}/expenses` | Get group expenses |
+
+## Expense Split Model
+
+```
+Net Balance = paid_share - owed_share
+
+Example: $300 dinner, User A pays, split 3 ways
+┌─────────┬──────────┬───────────┬─────────────────┐
+│ User    │ Paid     │ Owes      │ Net Balance     │
+├─────────┼──────────┼───────────┼─────────────────┤
+│ User A  │ $300     │ $100      │ +$200 (owed)    │
+│ User B  │ $0       │ $100      │ -$100 (owes)    │
+│ User C  │ $0       │ $100      │ -$100 (owes)    │
+└─────────┴──────────┴───────────┴─────────────────┘
+```
+
+## Testing
+
+```bash
+# Run all tests
+docker compose exec app php artisan test
+
+# Run specific test suite
+docker compose exec app php artisan test --filter=ExpenseManagementTest
+docker compose exec app php artisan test --filter=GroupManagementTest
+```
+
+**Test Coverage:**
+- 15 tests, 88 assertions
+- BDD-style with Given/When/Then pattern
+
+## Development
+
+### Project Structure
+
+```
+opensplit/
+├── app/
+│   ├── DTOs/                 # Data Transfer Objects
+│   ├── Exceptions/           # Custom exceptions
+│   ├── Http/Controllers/     # API controllers
+│   ├── Models/               # Eloquent models
+│   ├── Repositories/         # Data access layer
+│   └── Services/             # Business logic
+├── database/migrations/      # Database schema
+├── tests/Feature/            # BDD feature tests
+├── docker/                   # Docker configs
+└── .github/workflows/        # CI/CD pipelines
+```
+
+### Commands
+
+```bash
+# Start development
+docker compose up -d
+
+# Stop containers
+docker compose down
+
+# View logs
+docker compose logs -f app
+
+# Run artisan commands
+docker compose exec app php artisan <command>
+
+# Regenerate Swagger docs
+docker compose exec app php artisan l5-swagger:generate
+```
+
+## CI/CD
+
+### Automatic (on PR)
+- **CI Workflow**: Runs tests and linting on every pull request
+- Required for merging to `master`
+
+### Manual
+- **Docker Build**: Build and optionally push Docker images
+- Trigger from Actions tab → "Run workflow"
+
+See [docs/BRANCH_PROTECTION.md](docs/BRANCH_PROTECTION.md) for branch protection setup.
+
+## Production Deployment
+
+```bash
+# Use production override (hides DB port)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
 
 ## Contributing
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+> **Note:** Direct pushes to `master` are blocked. All changes require PR review.
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Inspired by [Splitwise](https://www.splitwise.com/)
+- Built with [Laravel](https://laravel.com/)
