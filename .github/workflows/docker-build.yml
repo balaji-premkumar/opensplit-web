@@ -1,4 +1,5 @@
 name: Docker Build & Release
+name: Docker Build & Release
 
 on:
   workflow_dispatch:
@@ -39,6 +40,14 @@ jobs:
       packages: write
 
     steps:
+      - name: Validate version format
+        run: |
+          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Error: Version must be in format X.Y.Z (e.g., 1.0.0)"
+            exit 1
+          fi
+          echo "✅ Version format validated: ${{ inputs.version }}"
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
