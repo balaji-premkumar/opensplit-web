@@ -1,0 +1,48 @@
+# OpenSplit Base Image - PHP 8.4 FPM with all dependencies
+# This image is built once and contains all system deps and PHP extensions
+# Rebuild only when dependencies change
+
+FROM php:8.4-fpm-alpine
+
+LABEL org.opencontainers.image.title="OpenSplit Base"
+LABEL org.opencontainers.image.description="Base image with PHP 8.4 FPM, system dependencies, and PHP extensions for OpenSplit"
+
+# Install system dependencies
+RUN apk add --no-cache \
+    git \
+    curl \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    libzip-dev \
+    zip \
+    unzip \
+    postgresql-dev \
+    oniguruma-dev \
+    icu-dev
+
+# Install PHP extensions
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install \
+    pdo \
+    pdo_pgsql \
+    pgsql \
+    mbstring \
+    bcmath \
+    gd \
+    zip \
+    intl \
+    opcache
+
+# Install Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# Set working directory
+WORKDIR /var/www/html
+
+# Create system user for running Composer and Artisan commands
+RUN addgroup -g 1000 appgroup && \
+    adduser -u 1000 -G appgroup -s /bin/sh -D appuser
+
+# Set default user (can be overridden in child images)
+USER appuser
