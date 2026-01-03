@@ -1,6 +1,6 @@
-# OpenSplit
+# OpenSplit Web
 
-**Open-source expense splitting application** - A Splitwise alternative built with enterprise-grade architecture.
+**Open-source expense splitting API** - A Splitwise alternative backend built with enterprise-grade architecture. Currently supports REST API with web UI coming soon.
 
 [![CI](https://github.com/balaji-premkumar/opensplit-web/actions/workflows/ci.yml/badge.svg)](https://github.com/balaji-premkumar/opensplit-web/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

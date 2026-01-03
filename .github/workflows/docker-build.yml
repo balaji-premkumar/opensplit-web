@@ -1,41 +1,53 @@
-name: Docker Build
+name: Docker Build & Release
 
 on:
   workflow_dispatch:
     inputs:
-      image_tag:
-        description: "Docker image tag (e.g., latest, v1.0.0, staging)"
+      version:
+        description: "Version number (e.g., 1.0.0, 1.2.3)"
         required: true
-        default: "latest"
         type: string
-      push_to_registry:
-        description: "Push image to GitHub Container Registry"
+      is_latest:
+        description: "Also tag as latest"
         required: true
-        default: false
+        default: true
         type: boolean
       environment:
         description: "Target environment"
         required: true
-        default: "development"
+        default: "production"
         type: choice
         options:
           - development
           - staging
           - production
+      release_notes:
+        description: "Release notes for this version"
+        required: true
+        default: "Bug fixes and improvements"
+        type: string
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build:
-    name: Build Docker Image
+  build-and-push:
+    name: Build & Push Docker Image
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
 
     steps:
+      - name: Validate version format
+        run: |
+          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Error: Version must be in format X.Y.Z (e.g., 1.0.0)"
+            exit 1
+          fi
+          echo "✅ Version format validated: ${{ inputs.version }}"
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -43,69 +55,126 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Login to GitHub Container Registry
-        if: ${{ inputs.push_to_registry }}
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=${{ inputs.image_tag }}
-            type=sha,prefix=
-
-      - name: Build image (local)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: false
-          load: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            APP_ENV=${{ inputs.environment }}
-
-      - name: Test image
+      - name: Generate Docker tags
+        id: tags
         run: |
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }} php -v
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }} php -m | grep -E "(pdo_pgsql|bcmath)"
+          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}"
+          if [ "${{ inputs.is_latest }}" == "true" ]; then
+            TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          fi
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+          echo "Generated tags: ${TAGS}"
 
-      - name: Push to GitHub Container Registry
-        if: ${{ inputs.push_to_registry }}
+      - name: Build and push image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
             APP_ENV=${{ inputs.environment }}
+          labels: |
+            org.opencontainers.image.title=OpenSplit Web
+            org.opencontainers.image.description=OpenSplit Web - Open-source expense splitting API. A Splitwise alternative built with Laravel 11, PostgreSQL, and enterprise-grade architecture. Currently supports REST API with social authentication.
+            org.opencontainers.image.version=${{ inputs.version }}
+            org.opencontainers.image.vendor=OpenSplit Web
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}#readme
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
 
-      - name: Image summary
+      - name: Test image
         run: |
-          echo "## 🐳 Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }} php -v
+          echo "✅ Image test passed"
+
+      - name: Update README with version badge
+        run: |
+          # Update version in README if badge exists, or add it
+          if grep -q "img.shields.io/badge/version" README.md; then
+            sed -i "s|img.shields.io/badge/version-[^-]*-|img.shields.io/badge/version-${{ inputs.version }}-|g" README.md
+          else
+            # Add version badge after the first line
+            sed -i "2i\\\\n![Version](https://img.shields.io/badge/version-${{ inputs.version }}-blue)" README.md
+          fi
+
+      - name: Commit version update
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add README.md
+          git diff --staged --quiet || git commit -m "chore: Update version to ${{ inputs.version }}"
+          git push || echo "No changes to push"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ inputs.version }}
+          name: Release v${{ inputs.version }}
+          body: |
+            ## 🚀 OpenSplit Web v${{ inputs.version }}
+
+            ### Release Notes
+            ${{ inputs.release_notes }}
+
+            ### 📦 Docker Image
+
+            **Pull the image:**
+            ```bash
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}
+            ```
+
+            **Or use latest:**
+            ```bash
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ```
+
+            ### 🔧 Environment
+            - **Target**: ${{ inputs.environment }}
+            - **Built from**: ${{ github.sha }}
+
+            ---
+            [View Documentation](${{ github.server_url }}/${{ github.repository }}#readme)
+          draft: false
+          prerelease: ${{ inputs.environment != 'production' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Job summary
+        run: |
+          echo "## 🐳 Docker Build & Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Image Details" >> $GITHUB_STEP_SUMMARY
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Registry | \`${{ env.REGISTRY }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Image | \`${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | \`${{ inputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Latest Tag | ${{ inputs.is_latest }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Environment | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Pushed | ${{ inputs.push_to_registry }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ inputs.push_to_registry }}" == "true" ]; then
-            echo "### 📦 Pull Command" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Pull Commands" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Specific version:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.is_latest }}" == "true" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Latest:**" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-            echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+            echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📝 Release Notes" >> $GITHUB_STEP_SUMMARY
+          echo "${{ inputs.release_notes }}" >> $GITHUB_STEP_SUMMARY

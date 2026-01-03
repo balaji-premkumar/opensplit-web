@@ -1,10 +1,10 @@
 # GitHub Copilot Instructions
 
-This document provides context for GitHub Copilot to understand the OpenSplit project structure and coding conventions.
+This document provides context for GitHub Copilot to understand the OpenSplit Web project structure and coding conventions.
 
 ## Project Overview
 
-**OpenSplit** is an open-source expense splitting application (Splitwise alternative) built with:
+**OpenSplit Web** is an open-source expense splitting API (Splitwise alternative) built with:
 
 -   **Framework**: Laravel 11 (PHP 8.4)
 -   **Database**: PostgreSQL 15

@@ -7,8 +7,8 @@ use OpenApi\Attributes as OA;
 /**
  * @OA\Info(
  *     version="1.0.0",
- *     title="OpenSplit API",
- *     description="Enterprise backend API for OpenSplit - an open-source Splitwise alternative",
+ *     title="OpenSplit Web API",
+ *     description="REST API for OpenSplit Web - an open-source Splitwise alternative. Currently supports API endpoints with web UI coming soon.",
  *     @OA\Contact(
  *         email="support@opensplit.io",
  *         name="OpenSplit Team"
